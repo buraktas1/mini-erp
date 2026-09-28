@@ -12,7 +12,8 @@ def sifre_hashle(sifre):
 
 # 1. Veri Tabanı Bağlantısı ve Tablolar
 def vt_kur():
-    conn = sqlite3.connect("mini_erp.db", check_same_thread=False)
+    # Temiz başlangıç için veritabanı adı güncellendi
+    conn = sqlite3.connect("mini_erp_v2.db", check_same_thread=False)
     cursor = conn.cursor()
     
     # Kullanıcılar tablosu
@@ -24,7 +25,7 @@ def vt_kur():
     )
     """)
 
-    # Ürünler tablosu (kullanici_id eklendi)
+    # Ürünler tablosu
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS urunler (
         urun_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +38,7 @@ def vt_kur():
     )
     """)
 
-    # Müşteriler tablosu (kullanici_id eklendi)
+    # Müşteriler tablosu
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS musteriler (
         musteri_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +51,7 @@ def vt_kur():
     )
     """)
 
-    # Satışlar tablosu (kullanici_id eklendi)
+    # Satışlar tablosu
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS satislar (
         satis_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,7 +123,7 @@ def auth_ekrani():
             else:
                 st.warning("Lütfen tüm alanları doldurun.")
 
-# Eğer giriş yapılmadıysa login ekranını göster ve dur
+# Eğer giriş yapılmadıysa login ekranını göster
 if not st.session_state.giris_yapildi:
     auth_ekrani()
     st.stop()
@@ -130,7 +131,6 @@ if not st.session_state.giris_yapildi:
 # ----------------- GİRİŞ YAPILDIKTAN SONRAKİ ERP PANELİ -----------------
 user_id = st.session_state.kullanici_id
 
-# Yan Menü (Sidebar) - Çıkış Yap Butonu
 with st.sidebar:
     st.write(f"👤 Aktif Kullanıcı: **{st.session_state.kullanici_adi}**")
     if st.button("Çıkış Yap"):
@@ -252,16 +252,12 @@ with sekme3:
                     m_id = int(df_m[df_m['firma_adi'] == secilen_musteri_adi].iloc[0]['musteri_id'])
                     u_id = int(urun_bilgi['urun_id'])
                     
-                    # 1. Satışı kaydet
                     cursor.execute("""
                     INSERT INTO satislar (kullanici_id, urun_id, musteri_id, adet, toplam_tutar) 
                     VALUES (?, ?, ?, ?, ?)
                     """, (user_id, u_id, m_id, satilan_adet, toplam_tutar))
                     
-                    # 2. Ürün stoğunu düş
                     cursor.execute("UPDATE urunler SET stok_miktari = stok_miktari - ? WHERE urun_id = ? AND kullanici_id = ?", (satilan_adet, u_id, user_id))
-                    
-                    # 3. Müşteri bakiyesine ekle
                     cursor.execute("UPDATE musteriler SET bakiye = bakiye + ? WHERE musteri_id = ? AND kullanici_id = ?", (toplam_tutar, m_id, user_id))
                     
                     conn.commit()

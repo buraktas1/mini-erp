@@ -12,8 +12,8 @@ def sifre_hashle(sifre):
 
 # 1. Veri Tabanı Bağlantısı ve Tablolar
 def vt_kur():
-    # Temiz başlangıç için veritabanı adı güncellendi
-    conn = sqlite3.connect("mini_erp_v2.db", check_same_thread=False)
+    # Temiz ve hatasız başlangıç için veritabanı adı
+    conn = sqlite3.connect("mini_erp_v3.db", check_same_thread=False)
     cursor = conn.cursor()
     
     # Kullanıcılar tablosu
@@ -38,7 +38,7 @@ def vt_kur():
     )
     """)
 
-    # Müşteriler tablosu
+    # Müşteriler tablosu (Bakiye/Borç kaldırıldı)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS musteriler (
         musteri_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +46,6 @@ def vt_kur():
         firma_adi TEXT NOT NULL,
         yetkili TEXT,
         telefon TEXT,
-        bakiye REAL DEFAULT 0.0,
         FOREIGN KEY (kullanici_id) REFERENCES kullanicilar (id)
     )
     """)
@@ -186,9 +185,9 @@ with sekme1:
         else:
             st.info("Henüz depoda ürün yok. Sol taraftan ürün ekleyebilirsin.")
 
-# 2. SEKME: MÜŞTERİ YÖNETİMİ
+# 2. SEKME: MÜŞTERİ YÖNETİMİ (Bakiye/Borç Alanları Çıkarıldı)
 with sekme2:
-    st.header("👥 Cari Hesaplar")
+    st.header("👥 Müşteri Rehberi")
     col1, col2 = st.columns([1, 2])
     
     with col1:
@@ -197,15 +196,14 @@ with sekme2:
             firma = st.text_input("Firma / Müşteri Adı")
             yetkili = st.text_input("Yetkili Kişi")
             tel = st.text_input("Telefon Numarası")
-            bakiye = st.number_input("Başlangıç Borç/Bakiye (TL)", min_value=0.0, step=50.0)
             m_kaydet = st.form_submit_button("Müşteriyi Kaydet")
             
             if m_kaydet:
                 if firma.strip():
                     cursor.execute("""
-                    INSERT INTO musteriler (kullanici_id, firma_adi, yetkili, telefon, bakiye) 
-                    VALUES (?, ?, ?, ?, ?)
-                    """, (user_id, firma, yetkili, tel, bakiye))
+                    INSERT INTO musteriler (kullanici_id, firma_adi, yetkili, telefon) 
+                    VALUES (?, ?, ?, ?)
+                    """, (user_id, firma, yetkili, tel))
                     conn.commit()
                     st.success(f"{firma} başarıyla kaydedildi!")
                     st.rerun()
@@ -214,7 +212,7 @@ with sekme2:
                     
     with col2:
         st.subheader("📋 Müşteri Listesi")
-        df_musteri = pd.read_sql_query("SELECT musteri_id, firma_adi, yetkili, telefon, bakiye FROM musteriler WHERE kullanici_id = ?", conn, params=(user_id,))
+        df_musteri = pd.read_sql_query("SELECT musteri_id, firma_adi, yetkili, telefon FROM musteriler WHERE kullanici_id = ?", conn, params=(user_id,))
         if not df_musteri.empty:
             st.dataframe(df_musteri, use_container_width=True)
         else:
@@ -252,16 +250,17 @@ with sekme3:
                     m_id = int(df_m[df_m['firma_adi'] == secilen_musteri_adi].iloc[0]['musteri_id'])
                     u_id = int(urun_bilgi['urun_id'])
                     
+                    # 1. Satışı kaydet
                     cursor.execute("""
                     INSERT INTO satislar (kullanici_id, urun_id, musteri_id, adet, toplam_tutar) 
                     VALUES (?, ?, ?, ?, ?)
                     """, (user_id, u_id, m_id, satilan_adet, toplam_tutar))
                     
+                    # 2. Ürün stoğunu düş
                     cursor.execute("UPDATE urunler SET stok_miktari = stok_miktari - ? WHERE urun_id = ? AND kullanici_id = ?", (satilan_adet, u_id, user_id))
-                    cursor.execute("UPDATE musteriler SET bakiye = bakiye + ? WHERE musteri_id = ? AND kullanici_id = ?", (toplam_tutar, m_id, user_id))
                     
                     conn.commit()
-                    st.success("✅ Satış başarıyla yapıldı! Stok düşüldü ve cari bakiye güncellendi.")
+                    st.success("✅ Satış başarıyla yapıldı ve stok düşüldü!")
                     st.rerun()
 
 # 4. SEKME: RAPORLAR
